@@ -1,0 +1,78 @@
+version: '3'
+
+services:
+
+  portainer:
+    image: portainer/portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    command: -H unix:///var/run/docker.sock
+    ports:
+      - 9000:9000
+
+  elasticsearch:
+    build:
+      context: elasticsearch/
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    environment:
+      - cluster.name=docker-cluster
+      - node.name=es-$${HOSTNAME}
+      - network.host=0.0.0.0
+      - discovery.zen.minimum_master_nodes=1
+      - discovery.type=single-node
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+      - bootstrap.memory_lock=true
+      - discovery.zen.ping.unicast.hosts=elasticsearch
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - esnet
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.1.1
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - XPACK_MONITORING_UI_CONTAINER_ELASTICSEARCH_ENABLED=false
+    ports:
+      - 5601:5601
+    networks:
+      - esnet
+    depends_on:
+      - elasticsearch
+
+  es-head:
+    image: mobz/elasticsearch-head:5
+    ports:
+      - 9100:9100
+    networks:
+      - esnet
+
+  es-importer:
+    image: giantswarm/tiny-tools
+    entrypoint: /bin/sh setup-es.sh
+    working_dir: /opt/es-import-templates
+    volumes:
+      - ./elasticsearch/init:/opt/es-import-templates
+    networks:
+      - esnet
+    depends_on:
+      - elasticsearch
+
+volumes:
+  portainer-data:
+    driver: local
+  esdata:
+    driver: local
+
+networks:
+  esnet:
+    driver: bridge

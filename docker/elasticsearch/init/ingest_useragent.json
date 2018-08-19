@@ -1,0 +1,10 @@
+{
+  "description" : "Add user agent information",
+  "processors" : [
+    {
+      "user_agent" : {
+        "field" : "agent"
+      }
+    }
+  ]
+}
